@@ -3,6 +3,7 @@ const cors = require("cors");
 const multer = require("multer");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
@@ -14,54 +15,74 @@ let invoices = [];
 /* ---------------- ספקים ---------------- */
 
 app.get("/suppliers", (req,res)=>{
-  res.json(suppliers);
+  try {
+    res.json(suppliers);
+  } catch (e) {
+    res.status(500).json({message:"server error"});
+  }
 });
 
 app.post("/supplier", (req,res)=>{
-  const { name } = req.body;
+  try {
+    const { name } = req.body;
 
-  if(!name){
-    return res.status(400).json({message:"missing name"});
+    if(!name){
+      return res.status(400).json({message:"missing name"});
+    }
+
+    if(!suppliers.includes(name)){
+      suppliers.push(name);
+    }
+
+    res.json({ok:true});
+
+  } catch (e) {
+    res.status(500).json({message:"server error"});
   }
-
-  if(!suppliers.includes(name)){
-    suppliers.push(name);
-  }
-
-  res.json({ok:true});
 });
 
 /* ---------------- העלאה ---------------- */
 
 app.post("/upload", upload.single("file"), (req,res)=>{
-  const { supplier, digits, date } = req.body;
+  try {
 
-  if(!supplier || !digits){
-    return res.status(400).json({message:"missing data"});
-  }
+    const { supplier, digits, date } = req.body;
 
-  // 🔥 בדיקת כפילות אמיתית
-  const exists = invoices.find(i =>
-    i.supplier === supplier &&
-    i.digits === digits
-  );
+    if(!supplier || !digits){
+      return res.status(400).json({message:"missing data"});
+    }
 
-  if(exists){
-    return res.status(400).json({
-      message:"חשבונית כבר קיימת למספר הזה"
+    // בדיקת כפילות
+    const exists = invoices.find(i =>
+      i.supplier === supplier &&
+      i.digits === digits
+    );
+
+    if(exists){
+      return res.status(400).json({
+        message:"⚠️ חשבונית כבר קיימת"
+      });
+    }
+
+    invoices.push({
+      supplier,
+      digits,
+      date,
+      time: new Date().toISOString()
     });
+
+    res.json({ok:true});
+
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({message:"upload failed"});
   }
-
-  invoices.push({
-    supplier,
-    digits,
-    date,
-    time: new Date().toISOString()
-  });
-
-  res.json({ok:true});
 });
 
-app.listen(3000, ()=>{
-  console.log("server running");
+/* ---------------- PORT (קריטי ל-Render) ---------------- */
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, ()=>{
+  console.log("server running on", PORT);
 });
