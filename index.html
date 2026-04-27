@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>העלאת חשבונית</title>
+<style>
+body { font-family: Arial; background:#111; color:#fff; padding:15px; }
+input, select, button { width:100%; padding:15px; margin:8px 0; font-size:18px; }
+button { background:#00c853; color:#fff; border:none; }
+</style>
+</head>
+
+<body>
+
+<h2>📤 העלאת חשבונית</h2>
+
+<select id="supplier"></select>
+
+<input id="digits" placeholder="4 ספרות אחרונות">
+<input type="date" id="date">
+<input type="file" id="file">
+
+<button onclick="upload()">שלח</button>
+
+<script>
+const API = "https://invoice-backend-omy5.onrender.com";
+
+document.getElementById("date").valueAsDate = new Date();
+
+async function loadSuppliers(){
+  let res = await fetch(API+"/suppliers");
+  let data = await res.json();
+
+  let s = document.getElementById("supplier");
+  s.innerHTML = "";
+
+  data.forEach(x=>{
+    s.innerHTML += `<option>${x}</option>`;
+  });
+}
+loadSuppliers();
+
+async function upload(){
+  let form = new FormData();
+  form.append("supplier", document.getElementById("supplier").value);
+  form.append("digits", document.getElementById("digits").value);
+  form.append("date", document.getElementById("date").value);
+  form.append("file", document.getElementById("file").files[0]);
+
+  let res = await fetch(API+"/upload",{
+    method:"POST",
+    body: form
+  });
+
+  let data = await res.json();
+  alert(data.message);
+}
+</script>
+
+</body>
+</html>
