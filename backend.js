@@ -17,7 +17,7 @@ let invoices = [];
 
 /* ================= GOOGLE DRIVE ================= */
 const auth = new google.auth.GoogleAuth({
-  keyFile: "./keys/google-drive.json",
+  keyFile: "./google-drive.json",
   scopes: ["https://www.googleapis.com/auth/drive"]
 });
 
