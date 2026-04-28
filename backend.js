@@ -8,16 +8,16 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.use(cors());
 app.use(express.json());
 
-/* ---------------- זיכרון זמני ---------------- */
+/* ===================== DATA ===================== */
 let suppliers = [];
 let invoices = [];
 
-/* ---------------- בדיקת חיים ---------------- */
+/* ===================== HEALTH ===================== */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - ALL IN ONE");
+  res.send("SERVER OK - FULL SYSTEM");
 });
 
-/* ---------------- ספקים ---------------- */
+/* ===================== SUPPLIERS ===================== */
 app.get("/suppliers", (req, res) => {
   res.json(suppliers);
 });
@@ -36,48 +36,58 @@ app.post("/supplier", (req, res) => {
   res.json({ ok: true, suppliers });
 });
 
-/* ---------------- חשבוניות ---------------- */
-app.post("/invoice", upload.single("file"), (req, res) => {
+/* ===================== INVOICES ===================== */
+app.post("/invoice", (req, res) => {
   const { supplier, invoiceNumber, date } = req.body;
 
   if (!supplier || !invoiceNumber) {
     return res.status(400).json({ error: "missing data" });
   }
 
-  // בדיקת כפילות
   const exists = invoices.find(
     (i) => i.supplier === supplier && i.invoiceNumber === invoiceNumber
   );
 
   if (exists) {
     return res.status(409).json({
-      error: "חשבונית כבר קיימת למספר הזה"
+      error: "חשבונית כבר קיימת"
     });
   }
 
-  const newInvoice = {
+  const invoice = {
     supplier,
     invoiceNumber,
     date: date || new Date().toISOString(),
     createdAt: new Date().toISOString()
   };
 
-  invoices.push(newInvoice);
+  invoices.push(invoice);
 
-  res.json({
-    ok: true,
-    invoice: newInvoice
-  });
+  res.json({ ok: true, invoice });
 });
 
-/* ---------------- רשימת חשבוניות ---------------- */
+/* ===================== LIST INVOICES ===================== */
 app.get("/invoices", (req, res) => {
   res.json(invoices);
 });
 
-/* ---------------- שרת ---------------- */
+/* ===================== UPLOAD FILE (IMAGE BASE) ===================== */
+app.post("/upload", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "no file uploaded" });
+  }
+
+  res.json({
+    ok: true,
+    message: "file received",
+    filename: req.file.originalname,
+    size: req.file.size
+  });
+});
+
+/* ===================== SERVER ===================== */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Server running on", PORT);
+  console.log("Server running on port", PORT);
 });
