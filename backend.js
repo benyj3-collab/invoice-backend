@@ -11,11 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ================= DATA ================= */
-let suppliers = [];
-let invoices = [];
-
-/* ================= GOOGLE DRIVE AUTH ================= */
+/* ================= GOOGLE AUTH ================= */
 const auth = new google.auth.GoogleAuth({
   keyFile: "./google-drive.json",
   scopes: ["https://www.googleapis.com/auth/drive"]
@@ -23,7 +19,7 @@ const auth = new google.auth.GoogleAuth({
 
 const drive = google.drive({ version: "v3", auth });
 
-/* ================= UPLOAD DIR ================= */
+/* ================= STORAGE ================= */
 const uploadDir = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadDir)) {
@@ -33,8 +29,7 @@ if (!fs.existsSync(uploadDir)) {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
-    const unique = Date.now() + "-" + file.originalname;
-    cb(null, unique);
+    cb(null, Date.now() + "-" + file.originalname);
   }
 });
 
@@ -42,32 +37,7 @@ const upload = multer({ storage });
 
 /* ================= SERVER ================= */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - FULL SYSTEM + DRIVE FIXED");
-});
-
-/* ================= SUPPLIERS ================= */
-app.get("/suppliers", (req, res) => {
-  res.json(suppliers);
-});
-
-app.post("/suppliers", (req, res) => {
-  const { name } = req.body;
-  suppliers.push(name);
-  res.json({ ok: true });
-});
-
-/* ================= INVOICES ================= */
-app.post("/invoices", (req, res) => {
-  const { supplier, invoiceNumber, date } = req.body;
-
-  const invoice = {
-    supplier,
-    invoiceNumber,
-    date: date || new Date().toISOString()
-  };
-
-  invoices.push(invoice);
-  res.json({ ok: true, invoice });
+  res.send("SERVER OK - DRIVE FIXED VERSION");
 });
 
 /* ================= PDF + DRIVE ================= */
@@ -75,7 +45,6 @@ app.get("/invoice-pdf", (req, res) => {
   const { supplier, invoiceNumber, date } = req.query;
 
   const doc = new PDFDocument();
-
   const filePath = path.join(__dirname, `temp-${invoiceNumber}.pdf`);
   const stream = fs.createWriteStream(filePath);
 
@@ -109,11 +78,13 @@ app.get("/invoice-pdf", (req, res) => {
       console.log("UPLOAD SUCCESS:", result.data);
 
       fs.unlinkSync(filePath);
-    catch (err) {
-  console.error("🔥 FULL DRIVE ERROR:", JSON.stringify(err, null, 2));
-}
+    } catch (err) {
+      console.error("DRIVE ERROR:", err);
+    }
+  });
+});
 
-/* ================= UPLOAD IMAGE ================= */
+/* ================= UPLOAD ================= */
 app.post("/upload-image", upload.single("file"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "no file" });
 
