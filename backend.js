@@ -109,11 +109,9 @@ app.get("/invoice-pdf", (req, res) => {
       console.log("UPLOAD SUCCESS:", result.data);
 
       fs.unlinkSync(filePath);
-    } catch (err) {
-      console.error("DRIVE ERROR:", err);
-    }
-  });
-});
+    catch (err) {
+  console.error("🔥 FULL DRIVE ERROR:", JSON.stringify(err, null, 2));
+}
 
 /* ================= UPLOAD IMAGE ================= */
 app.post("/upload-image", upload.single("file"), (req, res) => {
