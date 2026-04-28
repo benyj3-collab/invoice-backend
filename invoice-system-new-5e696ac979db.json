@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "invoice-system-new",
+  "private_key_id": "5e696ac979dbf795384597292c91eb7da9e43cc1",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEugIBADANBgkqhkiG9w0BAQEFAASCBKQwggSgAgEAAoIBAQDKOqDEcItqztcS\nT1ZVF/aXaCundXThZXo2fS76nJumHSWtgGuCTwdq6Duj03ebi9xIZjRsq6FjaSGm\nBqmk06Ojljcjbjtxvw2Rq1YrS3pp30ohS1z/hZYeLPXD0jv2TOw+V3NmdVjtEQSn\nXVZyuLV9yk2BPNB60TeGWiCGp0fpMv8bEKdg8SbpO2z+oRUh59jNV/n0n9G1s+Lo\nb085Jgd7B2raKzjHbOuTae7SO7VobedGjZr79qWFAnqv0ZpJEnQEkjTqUgrIB3dF\nKdMvAUGQOgE9iGKBWQ9eaz0p1ay+vCW5mRTQDm7k8UuiPkyvs8s/YeAT7vfMlRG6\nhDoLMckRAgMBAAECgf8uW8rr8TBlfQNcvd9WILibdC6GxxeNpVByvNm0QW7z3co6\nHZZQUL3/G0nIFOpCdlGwEzpvna3YAxIk6xDJ6zpM0Sp6dajggAne3XGs+WMeVfiD\nOPaPMbPkMczqTX+t94dWqwNKNT1IRKtuK5P33OGpVHDqzcOK4KDOpbK/jFztMTtC\nWfRzc+zWzFh97vlVrNegtSV6aE15OOhViWREHbx5dO6QkPV/M5MhollSpJphIZJv\nH3yXz4I5J2S6CCsj+Zbs0aUXk11PoO5/E0BmJBKB/l/eA53OYeQXJ8GosHi1yWHA\nknZqZpcg2hxbiISK8vLAukjCCOCz/PnER9+H49kCgYEA5D178/J7dt7SE1IwSLKm\nN9NdJokVWjXF6K7ZSYXsu6PpMWiulc5LEYkqHRUEpp7hKevmBhHnvviITW3QU+WM\nmPiYo5KyJKFPx4NtT3hjVrALLXJ2u5Z5xRocijr88UQIZSFIe16/yja3YKvDG6Z2\nP4HrGBB5Sg6O4nrLOG3FeNkCgYEA4tNBzHox9xj8H3LWmseHtp2Ye3Q1E+i/8P03\nEqjjbV7B6A8nUqFshbD5RRGIUWAddu9uSkVxmBo0BQQFiMd+P+6Adi/FZysu8Uc9\njDYe4+AWOosrAyVLsRL8h2JjCCsSJBQOwn61ytsSkqRxzXqRMG6apvJutJ53lroW\nVL6CbvkCgYAdrACZTkTOx1j4Og8c5FzHlSre/6NO/v6jqVeGP2rvWffO/JT11MPd\nm79l2H2qS61qDcjxsRI3uYe+yS/0ODt3B5qQaVnPeUkt3uAvHK+NbYWGewMEkCN0\nhFiBf/myQ+3zd8g8gazdVQ+x+aJ7zcBBsVom3r1l606YEu6of1zUwQKBgBIg/GNR\naOjs8Em7LffU9r3bvrIvSYa71Yt3UY2GPhchubHIdEYgbMIKsQGaMyD945z76f65\nqiiT/5BfD+ost6R4dX/8tXRXeTsDjKHGOZXQ9TXcpaVst64BbHmNnYirmJmVmNBm\nvDToaYWa6xWXND+At4+cVMjO2ZQMb3h6eYZRAoGAI3N/g5T+HW2+QekYSYSCCs3+\nt5XdsCsgMNDSYQcCD1Nwu6y4aOidWEZWeNj3CN6QlwYfzsnLiCnw1sKLuyNM7Mu+\nkI0D+iKCV4w8Yb2mgrxiMP2Y3k38RtFjgVURt6ZTL6Q7b/dgr0i9iRekmzwmsjN6\n4SdKlCjuSV11wHwfYkM=\n-----END PRIVATE KEY-----\n",
+  "client_email": "drive-access@invoice-system-new.iam.gserviceaccount.com",
+  "client_id": "112212703715965801188",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/drive-access%40invoice-system-new.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
