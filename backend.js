@@ -14,7 +14,7 @@ app.use(express.json());
 let suppliers = [];
 let invoices = [];
 
-/* ================= UPLOAD ================= */
+/* ================= FILE UPLOAD ================= */
 const uploadDir = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadDir)) {
@@ -33,9 +33,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-/* ================= HEALTH ================= */
+/* ================= SERVER CHECK ================= */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - FULL SYSTEM + PDF");
+  res.send("SERVER OK - FULL SYSTEM READY");
 });
 
 /* ================= SUPPLIERS ================= */
@@ -51,7 +51,7 @@ app.post("/suppliers", (req, res) => {
   }
 
   if (suppliers.includes(name)) {
-    return res.status(409).json({ error: "supplier exists" });
+    return res.status(409).json({ error: "supplier already exists" });
   }
 
   suppliers.push(name);
@@ -90,7 +90,7 @@ app.get("/invoices", (req, res) => {
   res.json(invoices);
 });
 
-/* ================= UPLOAD IMAGE ================= */
+/* ================= UPLOAD PDF READY ================= */
 app.post("/upload-image", upload.single("file"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "no file uploaded" });
@@ -116,7 +116,7 @@ app.get("/invoice-pdf", (req, res) => {
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    "attachment; filename=invoice.pdf"
+    `attachment; filename=invoice-${invoiceNumber}.pdf`
   );
 
   doc.pipe(res);
@@ -129,7 +129,7 @@ app.get("/invoice-pdf", (req, res) => {
   doc.text(`Date: ${date || new Date().toISOString()}`);
 
   doc.moveDown();
-  doc.text("Thank you for your business.");
+  doc.text("Ready for Google Drive integration.");
 
   doc.end();
 });
