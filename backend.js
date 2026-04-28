@@ -144,7 +144,7 @@ app.get("/invoice-pdf", (req, res) => {
      await drive.files.create({
   requestBody: {
     name: `invoice-${invoiceNumber}.pdf`,
-    parents: ["PASTE_FOLDER_ID_HERE"],
+    parents: [1rSkp1C_u-JuGRIKBUfEzVwsesz2ckI60],
     mimeType: "application/pdf"
   },
   media: {
