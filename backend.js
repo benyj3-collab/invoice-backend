@@ -1,9 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors());
 app.use(express.json());
@@ -12,9 +13,28 @@ app.use(express.json());
 let suppliers = [];
 let invoices = [];
 
+/* ================= UPLOAD SETUP ================= */
+const uploadDir = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueName = Date.now() + "-" + file.originalname;
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({ storage });
+
 /* ================= SERVER CHECK ================= */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - STEP 1 WORKING");
+  res.send("SERVER OK - FULL SYSTEM READY");
 });
 
 /* ================= SUPPLIERS ================= */
@@ -51,7 +71,7 @@ app.post("/invoices", (req, res) => {
   );
 
   if (exists) {
-    return res.status(409).json({ error: "invoice exists" });
+    return res.status(409).json({ error: "invoice already exists" });
   }
 
   const invoice = {
@@ -69,20 +89,21 @@ app.get("/invoices", (req, res) => {
   res.json(invoices);
 });
 
-/* ================= UPLOAD ================= */
-app.post("/upload", upload.single("file"), (req, res) => {
+/* ================= FILE UPLOAD ================= */
+app.post("/upload-image", upload.single("file"), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: "no file" });
+    return res.status(400).json({ error: "no file uploaded" });
   }
 
   res.json({
     ok: true,
-    fileName: req.file.originalname,
-    size: req.file.size
+    message: "file saved",
+    fileName: req.file.filename,
+    path: req.file.path
   });
 });
 
-/* ================= START ================= */
+/* ================= START SERVER ================= */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
