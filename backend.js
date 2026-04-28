@@ -15,7 +15,7 @@ app.use(express.json());
 let suppliers = [];
 let invoices = [];
 
-/* ================= GOOGLE DRIVE ================= */
+/* ================= GOOGLE DRIVE AUTH ================= */
 const auth = new google.auth.GoogleAuth({
   keyFile: "./google-drive.json",
   scopes: ["https://www.googleapis.com/auth/drive"]
@@ -23,7 +23,7 @@ const auth = new google.auth.GoogleAuth({
 
 const drive = google.drive({ version: "v3", auth });
 
-/* ================= FILE UPLOAD ================= */
+/* ================= UPLOAD DIR ================= */
 const uploadDir = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadDir)) {
@@ -31,20 +31,18 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = Date.now() + "-" + file.originalname;
-    cb(null, uniqueName);
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "-" + file.originalname;
+    cb(null, unique);
   }
 });
 
 const upload = multer({ storage });
 
-/* ================= SERVER CHECK ================= */
+/* ================= SERVER ================= */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - FULL SYSTEM + DRIVE");
+  res.send("SERVER OK - FULL SYSTEM + DRIVE FIXED");
 });
 
 /* ================= SUPPLIERS ================= */
@@ -54,35 +52,13 @@ app.get("/suppliers", (req, res) => {
 
 app.post("/suppliers", (req, res) => {
   const { name } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: "missing name" });
-  }
-
-  if (suppliers.includes(name)) {
-    return res.status(409).json({ error: "supplier exists" });
-  }
-
   suppliers.push(name);
-
-  res.json({ ok: true, suppliers });
+  res.json({ ok: true });
 });
 
 /* ================= INVOICES ================= */
 app.post("/invoices", (req, res) => {
   const { supplier, invoiceNumber, date } = req.body;
-
-  if (!supplier || !invoiceNumber) {
-    return res.status(400).json({ error: "missing data" });
-  }
-
-  const exists = invoices.find(
-    (i) => i.supplier === supplier && i.invoiceNumber === invoiceNumber
-  );
-
-  if (exists) {
-    return res.status(409).json({ error: "invoice exists" });
-  }
 
   const invoice = {
     supplier,
@@ -91,33 +67,12 @@ app.post("/invoices", (req, res) => {
   };
 
   invoices.push(invoice);
-
   res.json({ ok: true, invoice });
 });
 
-app.get("/invoices", (req, res) => {
-  res.json(invoices);
-});
-
-/* ================= UPLOAD ================= */
-app.post("/upload-image", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "no file" });
-  }
-
-  res.json({
-    ok: true,
-    fileName: req.file.filename
-  });
-});
-
-/* ================= PDF + GOOGLE DRIVE ================= */
+/* ================= PDF + DRIVE ================= */
 app.get("/invoice-pdf", (req, res) => {
   const { supplier, invoiceNumber, date } = req.query;
-
-  if (!supplier || !invoiceNumber) {
-    return res.status(400).send("missing data");
-  }
 
   const doc = new PDFDocument();
 
@@ -125,42 +80,49 @@ app.get("/invoice-pdf", (req, res) => {
   const stream = fs.createWriteStream(filePath);
 
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename=invoice-${invoiceNumber}.pdf`);
 
   doc.pipe(stream);
   doc.pipe(res);
 
   doc.fontSize(20).text("INVOICE", { align: "center" });
   doc.moveDown();
-
   doc.fontSize(14).text(`Supplier: ${supplier}`);
-  doc.text(`Invoice Number: ${invoiceNumber}`);
+  doc.text(`Invoice: ${invoiceNumber}`);
   doc.text(`Date: ${date || new Date().toISOString()}`);
 
   doc.end();
 
   stream.on("finish", async () => {
     try {
-     await drive.files.create({
-  requestBody: {
-    name: `invoice-${invoiceNumber}.pdf`,
-    parents: [1rSkp1C_u-JuGRIKBUfEzVwsesz2ckI60],
-    mimeType: "application/pdf"
-  },
-  media: {
-    mimeType: "application/pdf",
-    body: fs.createReadStream(filePath)
-  }
-});
+      const result = await drive.files.create({
+        requestBody: {
+          name: `invoice-${invoiceNumber}.pdf`,
+          mimeType: "application/pdf",
+          parents: ["1rSkp1C_u-JuGRIKBUfEzVwsesz2ckI60"]
+        },
+        media: {
+          mimeType: "application/pdf",
+          body: fs.createReadStream(filePath)
+        }
+      });
+
+      console.log("UPLOAD SUCCESS:", result.data);
 
       fs.unlinkSync(filePath);
     } catch (err) {
-      console.error("Drive upload error:", err);
+      console.error("DRIVE ERROR:", err);
     }
   });
 });
 
-/* ================= START SERVER ================= */
+/* ================= UPLOAD IMAGE ================= */
+app.post("/upload-image", upload.single("file"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "no file" });
+
+  res.json({ ok: true, file: req.file.filename });
+});
+
+/* ================= START ================= */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
