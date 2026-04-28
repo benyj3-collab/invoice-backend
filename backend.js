@@ -3,6 +3,7 @@ const cors = require("cors");
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
+const PDFDocument = require("pdfkit");
 
 const app = express();
 
@@ -13,7 +14,7 @@ app.use(express.json());
 let suppliers = [];
 let invoices = [];
 
-/* ================= UPLOAD SETUP ================= */
+/* ================= UPLOAD ================= */
 const uploadDir = path.join(__dirname, "uploads");
 
 if (!fs.existsSync(uploadDir)) {
@@ -32,9 +33,9 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-/* ================= SERVER CHECK ================= */
+/* ================= HEALTH ================= */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - FULL SYSTEM READY");
+  res.send("SERVER OK - FULL SYSTEM + PDF");
 });
 
 /* ================= SUPPLIERS ================= */
@@ -89,7 +90,7 @@ app.get("/invoices", (req, res) => {
   res.json(invoices);
 });
 
-/* ================= FILE UPLOAD ================= */
+/* ================= UPLOAD IMAGE ================= */
 app.post("/upload-image", upload.single("file"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "no file uploaded" });
@@ -97,13 +98,43 @@ app.post("/upload-image", upload.single("file"), (req, res) => {
 
   res.json({
     ok: true,
-    message: "file saved",
     fileName: req.file.filename,
     path: req.file.path
   });
 });
 
-/* ================= START SERVER ================= */
+/* ================= PDF ================= */
+app.get("/invoice-pdf", (req, res) => {
+  const { supplier, invoiceNumber, date } = req.query;
+
+  if (!supplier || !invoiceNumber) {
+    return res.status(400).send("missing data");
+  }
+
+  const doc = new PDFDocument();
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=invoice.pdf"
+  );
+
+  doc.pipe(res);
+
+  doc.fontSize(20).text("INVOICE", { align: "center" });
+  doc.moveDown();
+
+  doc.fontSize(14).text(`Supplier: ${supplier}`);
+  doc.text(`Invoice Number: ${invoiceNumber}`);
+  doc.text(`Date: ${date || new Date().toISOString()}`);
+
+  doc.moveDown();
+  doc.text("Thank you for your business.");
+
+  doc.end();
+});
+
+/* ================= SERVER ================= */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
