@@ -4,6 +4,7 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
+const { google } = require("googleapis");
 
 const app = express();
 
@@ -13,6 +14,14 @@ app.use(express.json());
 /* ================= DATA ================= */
 let suppliers = [];
 let invoices = [];
+
+/* ================= GOOGLE DRIVE ================= */
+const auth = new google.auth.GoogleAuth({
+  keyFile: "./keys/google-drive.json",
+  scopes: ["https://www.googleapis.com/auth/drive"]
+});
+
+const drive = google.drive({ version: "v3", auth });
 
 /* ================= FILE UPLOAD ================= */
 const uploadDir = path.join(__dirname, "uploads");
@@ -35,7 +44,7 @@ const upload = multer({ storage });
 
 /* ================= SERVER CHECK ================= */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - FULL SYSTEM READY");
+  res.send("SERVER OK - FULL SYSTEM + DRIVE");
 });
 
 /* ================= SUPPLIERS ================= */
@@ -51,7 +60,7 @@ app.post("/suppliers", (req, res) => {
   }
 
   if (suppliers.includes(name)) {
-    return res.status(409).json({ error: "supplier already exists" });
+    return res.status(409).json({ error: "supplier exists" });
   }
 
   suppliers.push(name);
@@ -72,7 +81,7 @@ app.post("/invoices", (req, res) => {
   );
 
   if (exists) {
-    return res.status(409).json({ error: "invoice already exists" });
+    return res.status(409).json({ error: "invoice exists" });
   }
 
   const invoice = {
@@ -90,20 +99,19 @@ app.get("/invoices", (req, res) => {
   res.json(invoices);
 });
 
-/* ================= UPLOAD PDF READY ================= */
+/* ================= UPLOAD ================= */
 app.post("/upload-image", upload.single("file"), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: "no file uploaded" });
+    return res.status(400).json({ error: "no file" });
   }
 
   res.json({
     ok: true,
-    fileName: req.file.filename,
-    path: req.file.path
+    fileName: req.file.filename
   });
 });
 
-/* ================= PDF ================= */
+/* ================= PDF + GOOGLE DRIVE ================= */
 app.get("/invoice-pdf", (req, res) => {
   const { supplier, invoiceNumber, date } = req.query;
 
@@ -113,12 +121,13 @@ app.get("/invoice-pdf", (req, res) => {
 
   const doc = new PDFDocument();
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename=invoice-${invoiceNumber}.pdf`
-  );
+  const filePath = path.join(__dirname, `temp-${invoiceNumber}.pdf`);
+  const stream = fs.createWriteStream(filePath);
 
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename=invoice-${invoiceNumber}.pdf`);
+
+  doc.pipe(stream);
   doc.pipe(res);
 
   doc.fontSize(20).text("INVOICE", { align: "center" });
@@ -128,13 +137,29 @@ app.get("/invoice-pdf", (req, res) => {
   doc.text(`Invoice Number: ${invoiceNumber}`);
   doc.text(`Date: ${date || new Date().toISOString()}`);
 
-  doc.moveDown();
-  doc.text("Ready for Google Drive integration.");
-
   doc.end();
+
+  stream.on("finish", async () => {
+    try {
+      await drive.files.create({
+        requestBody: {
+          name: `invoice-${invoiceNumber}.pdf`,
+          mimeType: "application/pdf"
+        },
+        media: {
+          mimeType: "application/pdf",
+          body: fs.createReadStream(filePath)
+        }
+      });
+
+      fs.unlinkSync(filePath);
+    } catch (err) {
+      console.error("Drive upload error:", err);
+    }
+  });
 });
 
-/* ================= SERVER ================= */
+/* ================= START SERVER ================= */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
