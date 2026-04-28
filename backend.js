@@ -141,16 +141,17 @@ app.get("/invoice-pdf", (req, res) => {
 
   stream.on("finish", async () => {
     try {
-      await drive.files.create({
-        requestBody: {
-          name: `invoice-${invoiceNumber}.pdf`,
-          mimeType: "application/pdf"
-        },
-        media: {
-          mimeType: "application/pdf",
-          body: fs.createReadStream(filePath)
-        }
-      });
+     await drive.files.create({
+  requestBody: {
+    name: `invoice-${invoiceNumber}.pdf`,
+    parents: ["PASTE_FOLDER_ID_HERE"],
+    mimeType: "application/pdf"
+  },
+  media: {
+    mimeType: "application/pdf",
+    body: fs.createReadStream(filePath)
+  }
+});
 
       fs.unlinkSync(filePath);
     } catch (err) {
