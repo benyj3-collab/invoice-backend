@@ -6,31 +6,31 @@ const { google } = require('googleapis');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-// ========================
+// =====================
 // Google Drive Auth
-// ========================
+// =====================
 const auth = new google.auth.GoogleAuth({
   keyFile: 'google-drive.json',
-  scopes: ['https://www.googleapis.com/auth/drive'],
+  scopes: ['https://www.googleapis.com/auth/drive.file'],
 });
 
 const drive = google.drive({ version: 'v3', auth });
 
-// ========================
-// ID של התיקיה בדרייב
-// ========================
-const FOLDER_ID = '1JOimVxKByqFOqfGWdHC6Qu696Wak2yql';
+// =====================
+// התיקיה שלך בגוגל דרייב
+// =====================
+const FOLDER_ID = '1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9';
 
-// ========================
+// =====================
 // בדיקת שרת
-// ========================
+// =====================
 app.get('/', (req, res) => {
   res.send('שרת פועל ✅');
 });
 
-// ========================
+// =====================
 // בדיקת העלאה (TEST)
-// ========================
+// =====================
 app.get('/upload-test', async (req, res) => {
   try {
     const fileMetadata = {
@@ -40,7 +40,7 @@ app.get('/upload-test', async (req, res) => {
 
     const media = {
       mimeType: 'text/plain',
-      body: 'Hello from test upload',
+      body: 'TEST UPLOAD WORKING',
     };
 
     const file = await drive.files.create({
@@ -56,15 +56,15 @@ app.get('/upload-test', async (req, res) => {
       fileId: file.data.id,
     });
 
-  } catch (error) {
-    console.error('🔥 UPLOAD TEST FAILED:', error);
+  } catch (err) {
+    console.error('UPLOAD ERROR:', err.message);
     res.status(500).send('בדיקת ההעלאה נכשלה');
   }
 });
 
-// ========================
+// =====================
 // העלאת קובץ אמיתי
-// ========================
+// =====================
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const fileMetadata = {
@@ -92,15 +92,15 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       fileId: file.data.id,
     });
 
-  } catch (error) {
-    console.error('🔥 UPLOAD FAILED:', error);
+  } catch (err) {
+    console.error('UPLOAD ERROR:', err.message);
     res.status(500).send('העלאה נכשלה');
   }
 });
 
-// ========================
+// =====================
 // הפעלת שרת
-// ========================
+// =====================
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
