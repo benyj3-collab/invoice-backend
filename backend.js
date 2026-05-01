@@ -20,9 +20,9 @@ const auth = new google.auth.GoogleAuth({
 
 const drive = google.drive({ version: "v3", auth });
 
-/* ================= TEST ================= */
+/* ================= SERVER ================= */
 app.get("/", (req, res) => {
-  res.send("SERVER OK - DRIVE TEST");
+  res.send("SERVER OK - DRIVE WORKING");
 });
 
 /* ================= PDF + DRIVE ================= */
@@ -47,14 +47,12 @@ app.get("/invoice-pdf", (req, res) => {
   doc.end();
 
   stream.on("finish", async () => {
-    console.log("📄 PDF CREATED");
-
     try {
       const result = await drive.files.create({
         requestBody: {
           name: `invoice-${invoiceNumber}.pdf`,
           mimeType: "application/pdf",
-          parents: ["1JvWQVfbcdP_KVXYkzEdEbkjKXbTO06bR"]
+          parents: ["1JOimVxKByqFOqfGWdHC6Qu696Wak2yql"]
         },
         media: {
           mimeType: "application/pdf",
@@ -62,12 +60,11 @@ app.get("/invoice-pdf", (req, res) => {
         }
       });
 
-      console.log("✅ UPLOAD SUCCESS:", result.data);
-      fs.unlinkSync(filePath);
+      console.log("UPLOAD SUCCESS:", result.data);
 
+      fs.unlinkSync(filePath);
     } catch (err) {
-      console.log("❌ DRIVE ERROR:");
-      console.log(err.message);
+      console.error("🔥 DRIVE ERROR:", err);
     }
   });
 });
