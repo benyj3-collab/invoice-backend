@@ -1,12 +1,14 @@
 const express = require('express');
 const multer = require('multer');
-const { google } = require('googleapis');
 const fs = require('fs');
+const { google } = require('googleapis');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-// 🔐 חיבור ל-Google Drive (Service Account)
+// ========================
+// Google Drive Auth
+// ========================
 const auth = new google.auth.GoogleAuth({
   keyFile: 'google-drive.json',
   scopes: ['https://www.googleapis.com/auth/drive'],
@@ -14,15 +16,21 @@ const auth = new google.auth.GoogleAuth({
 
 const drive = google.drive({ version: 'v3', auth });
 
-// 📌 ID של התיקיה שלך בדרייב
+// ========================
+// ID של התיקיה בדרייב
+// ========================
 const FOLDER_ID = '1JOimVxKByqFOqfGWdHC6Qu696Wak2yql';
 
-// 🧪 בדיקת שרת
+// ========================
+// בדיקת שרת
+// ========================
 app.get('/', (req, res) => {
-  res.send('Server running ✅');
+  res.send('שרת פועל ✅');
 });
 
-// 🧪 בדיקת העלאה (TEST)
+// ========================
+// בדיקת העלאה (TEST)
+// ========================
 app.get('/upload-test', async (req, res) => {
   try {
     const fileMetadata = {
@@ -32,7 +40,7 @@ app.get('/upload-test', async (req, res) => {
 
     const media = {
       mimeType: 'text/plain',
-      body: 'Hello from backend test upload',
+      body: 'Hello from test upload',
     };
 
     const file = await drive.files.create({
@@ -47,13 +55,16 @@ app.get('/upload-test', async (req, res) => {
       success: true,
       fileId: file.data.id,
     });
+
   } catch (error) {
-    console.error('🔥 TEST ERROR:', error);
-    res.status(500).send('Upload test failed');
+    console.error('🔥 UPLOAD TEST FAILED:', error);
+    res.status(500).send('בדיקת ההעלאה נכשלה');
   }
 });
 
-// 📤 העלאת קובץ אמיתי
+// ========================
+// העלאת קובץ אמיתי
+// ========================
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const fileMetadata = {
@@ -82,13 +93,16 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('🔥 UPLOAD ERROR:', error);
-    res.status(500).send('Upload failed');
+    console.error('🔥 UPLOAD FAILED:', error);
+    res.status(500).send('העלאה נכשלה');
   }
 });
 
-// 🚀 הפעלת שרת
+// ========================
+// הפעלת שרת
+// ========================
 const PORT = process.env.PORT || 10000;
+
 app.listen(PORT, () => {
   console.log('Server running on', PORT);
 });
