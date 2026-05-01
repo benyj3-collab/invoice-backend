@@ -57,7 +57,8 @@ app.get("/invoice-pdf", (req, res) => {
         media: {
           mimeType: "application/pdf",
           body: fs.createReadStream(filePath)
-        }
+        },
+        supportsAllDrives: true
       });
 
       console.log("UPLOAD SUCCESS:", result.data);
