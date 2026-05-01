@@ -3,19 +3,42 @@ const { google } = require("googleapis");
 
 const app = express();
 
+// =====================
+// 🔐 פרטי OAuth
+// =====================
 const CLIENT_ID = "901364224480-jh9argoe0lg9s94p3s1hlp1gd3aqnum0.apps.googleusercontent.com";
 const CLIENT_SECRET = "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";
+
+// חשוב: זה חייב להיות תואם למה שהגדרת ב־Google Cloud
 const REDIRECT_URI = "https://invoice-backend-2akp.onrender.com/oauth2callback";
 
-let REFRESH_TOKEN = ""; // נשמר אחרי התחברות
+// 👇 כאן אתה שם את ה־refresh token שלך
+const REFRESH_TOKEN = "1//06XJY22PAx9hLCgYIARAAGAYSNgF-L9IrFc7mcuAO_a_lBDdTPnjGRfUujPnFZ0P6pXsI24VR07bxn-xkixDez4EjjJ_jlbOg8g";
 
+// =====================
+// 🔧 יצירת חיבור OAuth
+// =====================
 const oauth2Client = new google.auth.OAuth2(
   CLIENT_ID,
   CLIENT_SECRET,
   REDIRECT_URI
 );
 
-// התחברות
+// פונקציה שמחזירה חיבור Drive תמיד
+function getDrive() {
+  oauth2Client.setCredentials({
+    refresh_token: REFRESH_TOKEN,
+  });
+
+  return google.drive({
+    version: "v3",
+    auth: oauth2Client,
+  });
+}
+
+// =====================
+// 🔗 התחברות (רק אם צריך שוב בעתיד)
+// =====================
 app.get("/login", (req, res) => {
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
@@ -26,37 +49,32 @@ app.get("/login", (req, res) => {
   res.redirect(url);
 });
 
-// callback
+// =====================
+// 🔁 callback (לא חובה עכשיו כי כבר יש לך token)
+// =====================
 app.get("/oauth2callback", async (req, res) => {
-  const code = req.query.code;
+  try {
+    const code = req.query.code;
 
-  const { tokens } = await oauth2Client.getToken(code);
+    if (!code) return res.send("Missing code");
 
-  REFRESH_TOKEN = tokens.refresh_token;
+    const { tokens } = await oauth2Client.getToken(code);
 
-  oauth2Client.setCredentials(tokens);
+    console.log("NEW REFRESH TOKEN:", tokens.refresh_token);
 
-  console.log("REFRESH TOKEN SAVED:", REFRESH_TOKEN);
-
-  res.send("OK - Google Drive connected");
+    res.send("OK - token printed in logs");
+  } catch (err) {
+    console.error(err);
+    res.send("Error in callback");
+  }
 });
 
-// פונקציה שמייצרת Drive בכל בקשה
-function getDrive() {
-  if (!REFRESH_TOKEN) return null;
-
-  oauth2Client.setCredentials({
-    refresh_token: REFRESH_TOKEN,
-  });
-
-  return google.drive({ version: "v3", auth: oauth2Client });
-}
-
-// בדיקה
+// =====================
+// 📤 העלאת קובץ לבדיקה
+// =====================
 app.get("/upload-test", async (req, res) => {
   try {
     const drive = getDrive();
-    if (!drive) return res.send("Not connected - go to /login");
 
     const response = await drive.files.create({
       requestBody: {
@@ -64,7 +82,7 @@ app.get("/upload-test", async (req, res) => {
       },
       media: {
         mimeType: "text/plain",
-        body: "Hello from Render fixed version",
+        body: "Hello from working system 🚀",
       },
     });
 
@@ -75,10 +93,12 @@ app.get("/upload-test", async (req, res) => {
   }
 });
 
+// =====================
 app.get("/", (req, res) => {
-  res.send("Server running");
+  res.send("Server running ✅");
 });
 
+// =====================
 app.listen(10000, () => {
-  console.log("Server running on 10000");
+  console.log("Server running on port 10000");
 });
