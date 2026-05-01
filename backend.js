@@ -7,7 +7,7 @@ const app = express();
 const upload = multer({ dest: 'uploads/' });
 
 // =====================
-// Google Auth
+// Google Drive Auth
 // =====================
 const auth = new google.auth.GoogleAuth({
   keyFile: 'google-drive.json',
@@ -17,15 +17,15 @@ const auth = new google.auth.GoogleAuth({
 const drive = google.drive({ version: 'v3', auth });
 
 // =====================
-// תיקיית יעד
+// תיקייה ב-Drive
 // =====================
 const FOLDER_ID = '1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9';
 
 // =====================
-// שרת חי
+// בדיקת שרת
 // =====================
 app.get('/', (req, res) => {
-  res.send('Server running ✅');
+  res.send('Server OK');
 });
 
 // =====================
@@ -38,16 +38,10 @@ app.get('/debug-drive', async (req, res) => {
       fields: 'files(id, name)',
     });
 
-    res.json({
-      ok: true,
-      files: result.data.files,
-    });
+    res.json({ ok: true, files: result.data.files });
 
   } catch (err) {
-    res.status(500).json({
-      ok: false,
-      error: err.message,
-    });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -63,7 +57,7 @@ app.get('/upload-test', async (req, res) => {
 
     const media = {
       mimeType: 'text/plain',
-      body: 'TEST OK',
+      body: 'TEST FILE',
     };
 
     const file = await drive.files.create({
@@ -72,14 +66,11 @@ app.get('/upload-test', async (req, res) => {
       fields: 'id',
     });
 
-    res.json({
-      success: true,
-      fileId: file.data.id,
-    });
+    res.json({ success: true, fileId: file.data.id });
 
   } catch (err) {
     console.error(err);
-    res.status(500).send('בדיקת ההעלאה נכשלה');
+    res.status(500).send('upload failed');
   }
 });
 
@@ -106,20 +97,16 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
     fs.unlinkSync(req.file.path);
 
-    res.json({
-      success: true,
-      fileId: file.data.id,
-    });
+    res.json({ success: true, fileId: file.data.id });
 
   } catch (err) {
     console.error(err);
-    res.status(500).send('Upload failed');
+    res.status(500).send('upload failed');
   }
 });
 
 // =====================
 const PORT = process.env.PORT || 10000;
-
 app.listen(PORT, () => {
   console.log('Server running on', PORT);
 });
