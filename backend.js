@@ -7,29 +7,52 @@ const app = express();
 const upload = multer({ dest: 'uploads/' });
 
 // =====================
-// Google Drive Auth
+// Google Auth
 // =====================
 const auth = new google.auth.GoogleAuth({
   keyFile: 'google-drive.json',
-  scopes: ['https://www.googleapis.com/auth/drive.file'],
+  scopes: ['https://www.googleapis.com/auth/drive'],
 });
 
 const drive = google.drive({ version: 'v3', auth });
 
 // =====================
-// התיקיה שלך בגוגל דרייב
+// תיקיית יעד
 // =====================
 const FOLDER_ID = '1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9';
 
 // =====================
-// בדיקת שרת
+// שרת חי
 // =====================
 app.get('/', (req, res) => {
-  res.send('שרת פועל ✅');
+  res.send('Server running ✅');
 });
 
 // =====================
-// בדיקת העלאה (TEST)
+// בדיקת חיבור ל-Drive
+// =====================
+app.get('/debug-drive', async (req, res) => {
+  try {
+    const result = await drive.files.list({
+      pageSize: 1,
+      fields: 'files(id, name)',
+    });
+
+    res.json({
+      ok: true,
+      files: result.data.files,
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.message,
+    });
+  }
+});
+
+// =====================
+// בדיקת העלאה
 // =====================
 app.get('/upload-test', async (req, res) => {
   try {
@@ -40,16 +63,14 @@ app.get('/upload-test', async (req, res) => {
 
     const media = {
       mimeType: 'text/plain',
-      body: 'TEST UPLOAD WORKING',
+      body: 'TEST OK',
     };
 
     const file = await drive.files.create({
       resource: fileMetadata,
-      media: media,
+      media,
       fields: 'id',
     });
-
-    console.log('Uploaded file ID:', file.data.id);
 
     res.json({
       success: true,
@@ -57,7 +78,7 @@ app.get('/upload-test', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('UPLOAD ERROR:', err.message);
+    console.error(err);
     res.status(500).send('בדיקת ההעלאה נכשלה');
   }
 });
@@ -79,13 +100,11 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
     const file = await drive.files.create({
       resource: fileMetadata,
-      media: media,
+      media,
       fields: 'id',
     });
 
     fs.unlinkSync(req.file.path);
-
-    console.log('Uploaded file ID:', file.data.id);
 
     res.json({
       success: true,
@@ -93,13 +112,11 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     });
 
   } catch (err) {
-    console.error('UPLOAD ERROR:', err.message);
-    res.status(500).send('העלאה נכשלה');
+    console.error(err);
+    res.status(500).send('Upload failed');
   }
 });
 
-// =====================
-// הפעלת שרת
 // =====================
 const PORT = process.env.PORT || 10000;
 
