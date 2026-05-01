@@ -6,7 +6,7 @@ const fs = require('fs');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
 
-// התחברות ל-Google Drive דרך הקובץ שלך
+// 🔐 חיבור ל-Google Drive (Service Account)
 const auth = new google.auth.GoogleAuth({
   keyFile: 'google-drive.json',
   scopes: ['https://www.googleapis.com/auth/drive'],
@@ -14,12 +14,51 @@ const auth = new google.auth.GoogleAuth({
 
 const drive = google.drive({ version: 'v3', auth });
 
-// העלאת קובץ ל-Drive
+// 📌 ID של התיקיה שלך בדרייב
+const FOLDER_ID = '1JOimVxKByqFOqfGWdHC6Qu696Wak2yql';
+
+// 🧪 בדיקת שרת
+app.get('/', (req, res) => {
+  res.send('Server running ✅');
+});
+
+// 🧪 בדיקת העלאה (TEST)
+app.get('/upload-test', async (req, res) => {
+  try {
+    const fileMetadata = {
+      name: `test-${Date.now()}.txt`,
+      parents: [FOLDER_ID],
+    };
+
+    const media = {
+      mimeType: 'text/plain',
+      body: 'Hello from backend test upload',
+    };
+
+    const file = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id',
+    });
+
+    console.log('Uploaded file ID:', file.data.id);
+
+    res.json({
+      success: true,
+      fileId: file.data.id,
+    });
+  } catch (error) {
+    console.error('🔥 TEST ERROR:', error);
+    res.status(500).send('Upload test failed');
+  }
+});
+
+// 📤 העלאת קובץ אמיתי
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const fileMetadata = {
       name: req.file.originalname,
-      parents: ['1JOimVxKByqFOqfGWdHC6Qu696Wak2yql'], // ID של התיקיה שלך
+      parents: [FOLDER_ID],
     };
 
     const media = {
@@ -36,19 +75,19 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     console.log('Uploaded file ID:', file.data.id);
-    res.send('File uploaded: ' + file.data.id);
+
+    res.json({
+      success: true,
+      fileId: file.data.id,
+    });
 
   } catch (error) {
-    console.error('🔥 DRIVE ERROR:', error);
+    console.error('🔥 UPLOAD ERROR:', error);
     res.status(500).send('Upload failed');
   }
 });
 
-// בדיקה פשוטה
-app.get('/', (req, res) => {
-  res.send('Server running ✅');
-});
-
+// 🚀 הפעלת שרת
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log('Server running on', PORT);
