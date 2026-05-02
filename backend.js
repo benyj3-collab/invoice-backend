@@ -1,114 +1,93 @@
-const express = require('express');
-const multer = require('multer');
-const fs = require('fs');
-const { google } = require('googleapis');
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+const fs = require("fs");
 
 const app = express();
-const upload = multer({ dest: 'uploads/' });
+app.use(cors());
+app.use(express.json());
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 // =====================
-// OAuth CONFIG (מוכן)
+// קבצי שמירה
 // =====================
-const CLIENT_ID = '901364224480-jh9argoe0lg9s94p3s1hlp1gd3aqnum0.apps.googleusercontent.com';
-const CLIENT_SECRET = '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';
-const REDIRECT_URI = 'https://invoice-backend-2akp.onrender.com/oauth2callback';
+const SUPPLIERS_FILE = "./suppliers.json";
+const INVOICES_FILE = "./invoices.json";
 
-// ✅ הטוקן שלך
-const REFRESH_TOKEN = '1//06XJY22PAx9hLCgYIARAAGAYSNgF-L9IrFc7mcuAO_a_lBDdTPnjGRfUujPnFZ0P6pXsI24VR07bxn-xkixDez4EjjJ_jlbOg8g';
+// =====================
+// פונקציות עזר
+// =====================
+function load(file) {
+  if (!fs.existsSync(file)) return [];
+  return JSON.parse(fs.readFileSync(file));
+}
 
-const oAuth2Client = new google.auth.OAuth2(
-  CLIENT_ID,
-  CLIENT_SECRET,
-  REDIRECT_URI
-);
+function save(file, data) {
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
 
-oAuth2Client.setCredentials({
-  refresh_token: REFRESH_TOKEN,
+// =====================
+// ספקים
+// =====================
+app.get("/suppliers", (req, res) => {
+  const data = load(SUPPLIERS_FILE);
+  res.json(data);
 });
 
-const drive = google.drive({
-  version: 'v3',
-  auth: oAuth2Client,
-});
+app.post("/supplier", (req, res) => {
+  const { name } = req.body;
 
-// =====================
-// 📁 תיקייה ב-Drive
-// =====================
-const FOLDER_ID = '1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9';
-
-// =====================
-app.get('/', (req, res) => {
-  res.send('Server running ✅');
-});
-
-// =====================
-// בדיקת העלאה
-// =====================
-app.get('/upload-test', async (req, res) => {
-  try {
-    const fileMetadata = {
-      name: `test-${Date.now()}.txt`,
-      parents: [FOLDER_ID],
-    };
-
-    const media = {
-      mimeType: 'text/plain',
-      body: 'TEST FILE',
-    };
-
-    const file = await drive.files.create({
-      resource: fileMetadata,
-      media,
-      fields: 'id',
-    });
-
-    res.json({
-      success: true,
-      fileId: file.data.id,
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('upload failed');
+  if (!name) {
+    return res.status(400).json({ message: "missing name" });
   }
-});
 
-// =====================
-// העלאת קובץ אמיתי
-// =====================
-app.post('/upload', upload.single('file'), async (req, res) => {
-  try {
-    const fileMetadata = {
-      name: req.file.originalname,
-      parents: [FOLDER_ID],
-    };
+  let suppliers = load(SUPPLIERS_FILE);
 
-    const media = {
-      mimeType: req.file.mimetype,
-      body: fs.createReadStream(req.file.path),
-    };
-
-    const file = await drive.files.create({
-      resource: fileMetadata,
-      media,
-      fields: 'id',
-    });
-
-    fs.unlinkSync(req.file.path);
-
-    res.json({
-      success: true,
-      fileId: file.data.id,
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('upload failed');
+  if (!suppliers.includes(name)) {
+    suppliers.push(name);
+    save(SUPPLIERS_FILE, suppliers);
   }
+
+  res.json({ ok: true });
 });
 
 // =====================
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log('Server running on', PORT);
+// העלאה (לוג בלבד - כמו שהיה אצלך)
+// =====================
+app.post("/upload", upload.single("file"), (req, res) => {
+  const { supplier, digits, date } = req.body;
+
+  if (!supplier || !digits) {
+    return res.status(400).json({ message: "missing data" });
+  }
+
+  let invoices = load(INVOICES_FILE);
+
+  const exists = invoices.find(i =>
+    i.supplier === supplier &&
+    i.digits === digits
+  );
+
+  if (exists) {
+    return res.status(400).json({
+      message: "חשבונית כבר קיימת למספר הזה"
+    });
+  }
+
+  invoices.push({
+    supplier,
+    digits,
+    date,
+    time: new Date().toISOString()
+  });
+
+  save(INVOICES_FILE, invoices);
+
+  res.json({ ok: true });
+});
+
+// =====================
+app.listen(3000, () => {
+  console.log("server running");
 });
