@@ -7,14 +7,14 @@ const app = express();
 const upload = multer({ dest: 'uploads/' });
 
 // =====================
-// OAuth (מה שכבר עבד לך)
+// OAuth CONFIG (מוכן)
 // =====================
 const CLIENT_ID = '901364224480-jh9argoe0lg9s94p3s1hlp1gd3aqnum0.apps.googleusercontent.com';
 const CLIENT_SECRET = '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';
 const REDIRECT_URI = 'https://invoice-backend-2akp.onrender.com/oauth2callback';
 
-// 👇 זה הטוקן שקיבלת (refresh token)
-const REFRESH_TOKEN = 'PUT_YOUR_REFRESH_TOKEN_HERE';
+// ✅ הטוקן שלך
+const REFRESH_TOKEN = '1//06XJY22PAx9hLCgYIARAAGAYSNgF-L9IrFc7mcuAO_a_lBDdTPnjGRfUujPnFZ0P6pXsI24VR07bxn-xkixDez4EjjJ_jlbOg8g';
 
 const oAuth2Client = new google.auth.OAuth2(
   CLIENT_ID,
@@ -32,13 +32,13 @@ const drive = google.drive({
 });
 
 // =====================
-// 🔥 התיקייה שלך (זה מה שחסר לך)
+// 📁 תיקייה ב-Drive
 // =====================
 const FOLDER_ID = '1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9';
 
 // =====================
 app.get('/', (req, res) => {
-  res.send('Server OK');
+  res.send('Server running ✅');
 });
 
 // =====================
@@ -48,7 +48,7 @@ app.get('/upload-test', async (req, res) => {
   try {
     const fileMetadata = {
       name: `test-${Date.now()}.txt`,
-      parents: [FOLDER_ID], // 🔥 זה הפתרון שלך
+      parents: [FOLDER_ID],
     };
 
     const media = {
@@ -80,7 +80,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const fileMetadata = {
       name: req.file.originalname,
-      parents: [FOLDER_ID], // 🔥 גם כאן
+      parents: [FOLDER_ID],
     };
 
     const media = {
