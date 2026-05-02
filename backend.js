@@ -11,15 +11,15 @@ app.use(express.json());
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+// ===== קבצים =====
 const SUPPLIERS_FILE = "./suppliers.json";
 const INVOICES_FILE = "./invoices.json";
-const FOLDERS_FILE = "./folders.json"; // 🔥 חדש
 
-// ===== GOOGLE =====
-const CLIENT_ID = "YOUR_CLIENT_ID";
-const CLIENT_SECRET = "YOUR_SECRET";
-const REDIRECT_URI = "YOUR_REDIRECT";
-const REFRESH_TOKEN = "YOUR_REFRESH_TOKEN";
+// ===== GOOGLE DRIVE =====
+const CLIENT_ID = "PASTE_YOURS";
+const CLIENT_SECRET = "PASTE_YOURS";
+const REDIRECT_URI = "PASTE_YOURS";
+const REFRESH_TOKEN = "PASTE_YOURS";
 
 const oAuth2Client = new google.auth.OAuth2(
   CLIENT_ID,
@@ -27,50 +27,26 @@ const oAuth2Client = new google.auth.OAuth2(
   REDIRECT_URI
 );
 
-oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+oAuth2Client.setCredentials({
+  refresh_token: REFRESH_TOKEN
+});
 
 const drive = google.drive({
   version: "v3",
   auth: oAuth2Client
 });
 
-const ROOT_FOLDER_ID = "1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9";
+// תיקיה ראשית בלבד (ללא תיקיות ספקים)
+const FOLDER_ID = "1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9";
 
-// ===== FILE HELPERS =====
+// ===== helpers =====
 function load(file) {
-  if (!fs.existsSync(file)) return {};
+  if (!fs.existsSync(file)) return [];
   return JSON.parse(fs.readFileSync(file));
 }
 
 function save(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
-}
-
-// ===== תיקיית ספק לפי ID (יציב!) =====
-async function getSupplierFolder(supplier) {
-  let folders = load(FOLDERS_FILE);
-
-  // כבר קיים
-  if (folders[supplier]) {
-    return folders[supplier];
-  }
-
-  // יצירה חדשה
-  const folder = await drive.files.create({
-    requestBody: {
-      name: supplier,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [ROOT_FOLDER_ID]
-    },
-    fields: "id"
-  });
-
-  folders[supplier] = folder.data.id;
-  save(FOLDERS_FILE, folders);
-
-  console.log("📁 created folder:", supplier);
-
-  return folder.data.id;
 }
 
 // ===== ספקים =====
@@ -120,16 +96,14 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "כבר קיים" });
     }
 
-    // 🔥 תיקיית ספק יציבה
-    const folderId = await getSupplierFolder(supplier);
-
+    // העלאה ל־Drive
     const bufferStream = new stream.PassThrough();
     bufferStream.end(req.file.buffer);
 
     const response = await drive.files.create({
       requestBody: {
         name: `${supplier}-${digits}-${Date.now()}.pdf`,
-        parents: [folderId]
+        parents: [FOLDER_ID]
       },
       media: {
         mimeType: req.file.mimetype,
