@@ -7,42 +7,38 @@ const app = express();
 const upload = multer({ dest: 'uploads/' });
 
 // =====================
-// Google Drive Auth
+// OAuth (מה שכבר עבד לך)
 // =====================
-const auth = new google.auth.GoogleAuth({
-  keyFile: 'google-drive.json',
-  scopes: ['https://www.googleapis.com/auth/drive'],
+const CLIENT_ID = '901364224480-jh9argoe0lg9s94p3s1hlp1gd3aqnum0.apps.googleusercontent.com';
+const CLIENT_SECRET = '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';
+const REDIRECT_URI = 'https://invoice-backend-2akp.onrender.com/oauth2callback';
+
+// 👇 זה הטוקן שקיבלת (refresh token)
+const REFRESH_TOKEN = 'PUT_YOUR_REFRESH_TOKEN_HERE';
+
+const oAuth2Client = new google.auth.OAuth2(
+  CLIENT_ID,
+  CLIENT_SECRET,
+  REDIRECT_URI
+);
+
+oAuth2Client.setCredentials({
+  refresh_token: REFRESH_TOKEN,
 });
 
-const drive = google.drive({ version: 'v3', auth });
+const drive = google.drive({
+  version: 'v3',
+  auth: oAuth2Client,
+});
 
 // =====================
-// תיקייה ב-Drive
+// 🔥 התיקייה שלך (זה מה שחסר לך)
 // =====================
 const FOLDER_ID = '1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9';
 
 // =====================
-// בדיקת שרת
-// =====================
 app.get('/', (req, res) => {
   res.send('Server OK');
-});
-
-// =====================
-// בדיקת חיבור ל-Drive
-// =====================
-app.get('/debug-drive', async (req, res) => {
-  try {
-    const result = await drive.files.list({
-      pageSize: 1,
-      fields: 'files(id, name)',
-    });
-
-    res.json({ ok: true, files: result.data.files });
-
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
 });
 
 // =====================
@@ -52,7 +48,7 @@ app.get('/upload-test', async (req, res) => {
   try {
     const fileMetadata = {
       name: `test-${Date.now()}.txt`,
-      parents: [FOLDER_ID],
+      parents: [FOLDER_ID], // 🔥 זה הפתרון שלך
     };
 
     const media = {
@@ -66,7 +62,10 @@ app.get('/upload-test', async (req, res) => {
       fields: 'id',
     });
 
-    res.json({ success: true, fileId: file.data.id });
+    res.json({
+      success: true,
+      fileId: file.data.id,
+    });
 
   } catch (err) {
     console.error(err);
@@ -81,7 +80,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const fileMetadata = {
       name: req.file.originalname,
-      parents: [FOLDER_ID],
+      parents: [FOLDER_ID], // 🔥 גם כאן
     };
 
     const media = {
@@ -97,7 +96,10 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
     fs.unlinkSync(req.file.path);
 
-    res.json({ success: true, fileId: file.data.id });
+    res.json({
+      success: true,
+      fileId: file.data.id,
+    });
 
   } catch (err) {
     console.error(err);
