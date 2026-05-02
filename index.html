@@ -22,38 +22,65 @@ button { background:#00c853; color:#fff; border:none; }
 
 <button onclick="upload()">שלח</button>
 
+<p id="status"></p>
+
 <script>
-const API = "https://invoice-backend-omy5.onrender.com";
+const API = "https://invoice-backend-2akp.onrender.com"; // ✅ השרת הנכון
 
 document.getElementById("date").valueAsDate = new Date();
 
 async function loadSuppliers(){
-  let res = await fetch(API+"/suppliers");
-  let data = await res.json();
+  try {
+    let res = await fetch(API + "/suppliers");
+    let data = await res.json();
 
-  let s = document.getElementById("supplier");
-  s.innerHTML = "";
+    let s = document.getElementById("supplier");
+    s.innerHTML = "";
 
-  data.forEach(x=>{
-    s.innerHTML += `<option>${x}</option>`;
-  });
+    data.forEach(x=>{
+      s.innerHTML += `<option>${x}</option>`;
+    });
+  } catch (err) {
+    console.log(err);
+  }
 }
 loadSuppliers();
 
 async function upload(){
+  let status = document.getElementById("status");
+
+  let fileInput = document.getElementById("file");
+
+  if (!fileInput.files.length) {
+    status.innerText = "בחר קובץ קודם";
+    return;
+  }
+
   let form = new FormData();
   form.append("supplier", document.getElementById("supplier").value);
   form.append("digits", document.getElementById("digits").value);
   form.append("date", document.getElementById("date").value);
-  form.append("file", document.getElementById("file").files[0]);
+  form.append("file", fileInput.files[0]);
 
-  let res = await fetch(API+"/upload",{
-    method:"POST",
-    body: form
-  });
+  status.innerText = "מעלה...";
 
-  let data = await res.json();
-  alert(data.message);
+  try {
+    let res = await fetch(API + "/upload",{
+      method:"POST",
+      body: form
+    });
+
+    let data = await res.json();
+
+    if (data.success) {
+      status.innerText = "✅ הועלה בהצלחה";
+    } else {
+      status.innerText = "❌ שגיאה";
+    }
+
+  } catch (err) {
+    status.innerText = "❌ שגיאת חיבור לשרת";
+  }
 }
 </script>
 
