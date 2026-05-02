@@ -13,7 +13,9 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const SUPPLIERS_FILE = "./suppliers.json";
 const INVOICES_FILE = "./invoices.json";
+const FOLDERS_FILE = "./folders.json"; // 🔥 חדש
 
+// ===== GOOGLE =====
 const CLIENT_ID = "YOUR_CLIENT_ID";
 const CLIENT_SECRET = "YOUR_SECRET";
 const REDIRECT_URI = "YOUR_REDIRECT";
@@ -32,12 +34,11 @@ const drive = google.drive({
   auth: oAuth2Client
 });
 
-// 📁 תיקיית האב (Invoices)
 const ROOT_FOLDER_ID = "1OLhekPhsvTQF3m4gQq0f38OM_mECIdA9";
 
-// ===== helpers =====
+// ===== FILE HELPERS =====
 function load(file) {
-  if (!fs.existsSync(file)) return [];
+  if (!fs.existsSync(file)) return {};
   return JSON.parse(fs.readFileSync(file));
 }
 
@@ -45,19 +46,16 @@ function save(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
-// ===== יצירת / מציאת תיקיית ספק =====
+// ===== תיקיית ספק לפי ID (יציב!) =====
 async function getSupplierFolder(supplier) {
-  // חיפוש תיקיה קיימת
-  const res = await drive.files.list({
-    q: `name='${supplier}' and mimeType='application/vnd.google-apps.folder' and '${ROOT_FOLDER_ID}' in parents and trashed=false`,
-    fields: "files(id, name)"
-  });
+  let folders = load(FOLDERS_FILE);
 
-  if (res.data.files.length > 0) {
-    return res.data.files[0].id;
+  // כבר קיים
+  if (folders[supplier]) {
+    return folders[supplier];
   }
 
-  // אם לא קיים - יצירה
+  // יצירה חדשה
   const folder = await drive.files.create({
     requestBody: {
       name: supplier,
@@ -67,6 +65,9 @@ async function getSupplierFolder(supplier) {
     fields: "id"
   });
 
+  folders[supplier] = folder.data.id;
+  save(FOLDERS_FILE, folders);
+
   console.log("📁 created folder:", supplier);
 
   return folder.data.id;
@@ -74,20 +75,27 @@ async function getSupplierFolder(supplier) {
 
 // ===== ספקים =====
 app.get("/suppliers", (req, res) => {
-  res.json(load(SUPPLIERS_FILE));
+  let data = load(SUPPLIERS_FILE);
+  if (!Array.isArray(data)) data = [];
+  res.json(data);
 });
 
 app.post("/supplier", (req, res) => {
   const { name } = req.body;
 
-  if (!name) return res.status(400).json({ message: "missing name" });
+  if (!name) {
+    return res.status(400).json({ message: "missing name" });
+  }
 
   let suppliers = load(SUPPLIERS_FILE);
+  if (!Array.isArray(suppliers)) suppliers = [];
 
   if (!suppliers.includes(name)) {
     suppliers.push(name);
     save(SUPPLIERS_FILE, suppliers);
   }
+
+  console.log("✔ supplier saved:", name);
 
   res.json({ ok: true });
 });
@@ -102,6 +110,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     }
 
     let invoices = load(INVOICES_FILE);
+    if (!Array.isArray(invoices)) invoices = [];
 
     const exists = invoices.find(i =>
       i.supplier === supplier && i.digits === digits
@@ -111,17 +120,16 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ message: "כבר קיים" });
     }
 
-    // 📁 קבלת תיקיית ספק
-    const supplierFolderId = await getSupplierFolder(supplier);
+    // 🔥 תיקיית ספק יציבה
+    const folderId = await getSupplierFolder(supplier);
 
-    // העלאה
     const bufferStream = new stream.PassThrough();
     bufferStream.end(req.file.buffer);
 
     const response = await drive.files.create({
       requestBody: {
         name: `${supplier}-${digits}-${Date.now()}.pdf`,
-        parents: [supplierFolderId]
+        parents: [folderId]
       },
       media: {
         mimeType: req.file.mimetype,
@@ -141,10 +149,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
     save(INVOICES_FILE, invoices);
 
+    console.log("✔ uploaded:", fileId);
+
     res.json({ ok: true });
 
   } catch (err) {
-    console.error(err);
+    console.error("❌ ERROR:", err.message);
     res.status(500).json({ message: "upload failed" });
   }
 });
