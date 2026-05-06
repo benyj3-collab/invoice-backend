@@ -42,6 +42,7 @@ function doPost(e){
     if(data.action==="uploadInvoice")result=uploadInvoice(data);
     else if(data.action==="updatePayment")result=updatePayment(data);
     else if(data.action==="renameSupplier")result=renameSupplier(data);
+    else if(data.action==="deleteSupplier")result=deleteSupplier(data);
     else if(data.action==="sendReport")result=sendReport(data);
     else result={success:false,error:"unknown: "+data.action};
     return setCors(ContentService.createTextOutput(JSON.stringify(result)));
@@ -143,6 +144,19 @@ function updatePayment(data){
   return{success:false,error:"חשבונית לא נמצאה"};
 }
 
+function deleteSupplier(data){
+  // מסיר את הספק מהתיקיות (לא מוחק את הקבצים)
+  var name=data.supplier;
+  if(!name)return{success:false,error:"חסר שם ספק"};
+  // שינוי שם התיקיה כדי לסמן כ"מחוק" — לא מוחק לצמיתות
+  var it=getMainFolder().getFoldersByName(name);
+  if(it.hasNext()){
+    var f=it.next();
+    f.setName("_מחוק_"+name);
+  }
+  return{success:true};
+}
+
 function renameSupplier(data){
   var oldName=data.oldName,newName=data.newName||data.oldName,cat=data.category||"";
   if(!oldName)return{success:false,error:"חסרים פרטים"};
@@ -214,23 +228,54 @@ function sendReport(params){
   var email=params.email||"";
   var inv=getInvoices({supplier:params.supplier||"all",dateFrom:params.dateFrom||"",dateTo:params.dateTo||"",status:params.status||"all"});
   if(!inv.success)return inv;
-  var total=0;
-  inv.invoices.forEach(function(i){total+=parseFloat(i.amtTotal)||0;});
-  var body="דוח חשבוניות מירב 🧾\n";
-  body+="============================\n";
-  body+="ספק: "+(params.supplier==="all"||!params.supplier?"כל הספקים":params.supplier)+"\n";
-  body+="תקופה: "+(params.dateFrom||"—")+" עד "+(params.dateTo||"—")+"\n";
-  body+="סה\"כ: "+inv.invoices.length+" חשבוניות | ₪"+total.toFixed(2)+"\n";
-  body+="============================\n\n";
-  inv.invoices.forEach(function(i,n){
-    body+=(n+1)+". "+i.supplier+(i.invNum?" #"+i.invNum:"")+" | "+i.digits+" | "+i.date;
-    if(i.amtTotal) body+=" | ₪"+parseFloat(i.amtTotal).toFixed(2);
-    body+=" | "+(i.paid?"✅ שולם":"⏳ לא שולם");
-    if(i.payment&&i.payment!=="טרם שולם") body+=" ("+i.payment+")";
-    if(i.fileUrl) body+="\n   🔗 "+i.fileUrl;
-    body+="\n\n";
+  var total=0,paidTotal=0,cashTotal=0,checkTotal=0,bankTotal=0;
+  inv.invoices.forEach(function(i){
+    var amt=parseFloat(i.amtTotal)||0;
+    total+=amt;
+    var pm=String(i.payment||"");
+    if(i.paid){
+      paidTotal+=amt;
+      if(pm.indexOf("מזומן")!==-1)cashTotal+=amt;
+      else if(pm.indexOf("צ'ק")!==-1||pm.indexOf("צק")!==-1)checkTotal+=amt;
+      else if(pm.indexOf("העברה")!==-1)bankTotal+=amt;
+    }
   });
-  MailApp.sendEmail({to:email,subject:"דוח חשבוניות מירב — "+new Date().toLocaleDateString("he-IL"),body:body});
+
+  // HTML email
+  var html='<div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">';
+  html+='<div style="background:linear-gradient(135deg,#6c3eb8,#8b5cf6);padding:20px;border-radius:12px 12px 0 0;text-align:center;">';
+  html+='<h1 style="color:#fff;margin:0;font-size:22px;">🧾 דוח חשבוניות מירב</h1>';
+  html+='<p style="color:rgba(255,255,255,.8);margin:6px 0 0;font-size:13px;">'+(params.dateFrom||"—")+" עד "+(params.dateTo||"—")+'</p>';
+  html+='</div>';
+  html+='<div style="background:#f3eeff;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+  html+='<div style="background:#fff;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:900;color:#6c3eb8;">'+inv.invoices.length+'</div><div style="font-size:11px;color:#9d8ec4;">חשבוניות</div></div>';
+  html+='<div style="background:#fff;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:18px;font-weight:900;color:#d97706;">₪'+total.toFixed(2)+'</div><div style="font-size:11px;color:#9d8ec4;">סה"כ</div></div>';
+  html+='<div style="background:#dcfce7;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#16a34a;">💵 ₪'+cashTotal.toFixed(2)+'</div><div style="font-size:10px;color:#16a34a;">מזומן</div></div>';
+  html+='<div style="background:#dbeafe;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#2563eb;">📄 ₪'+checkTotal.toFixed(2)+'</div><div style="font-size:10px;color:#2563eb;">צ׳קים</div></div>';
+  html+='<div style="background:#ccfbf1;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#0d9488;">🏦 ₪'+bankTotal.toFixed(2)+'</div><div style="font-size:10px;color:#0d9488;">העברות</div></div>';
+  html+='<div style="background:#fee2e2;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#dc2626;">⏳ ₪'+(total-paidTotal).toFixed(2)+'</div><div style="font-size:10px;color:#dc2626;">טרם שולם</div></div>';
+  html+='</div>';
+  html+='<table style="width:100%;border-collapse:collapse;background:#fff;">';
+  html+='<tr style="background:#6c3eb8;color:#fff;font-size:12px;"><th style="padding:8px;text-align:right;">ספק</th><th style="padding:8px;">תאריך</th><th style="padding:8px;">₪</th><th style="padding:8px;">תשלום</th></tr>';
+  inv.invoices.forEach(function(i,n){
+    var bg=n%2===0?"#fff":"#f7f3ff";
+    var statusColor=i.paid?"#16a34a":"#dc2626";
+    var statusIcon=i.paid?"✅":"⏳";
+    html+='<tr style="background:'+bg+';">';
+    html+='<td style="padding:8px;font-weight:700;font-size:13px;">'+i.supplier+(i.invNum?" <span style='color:#6c3eb8;'>#"+i.invNum+"</span>":"")+'</td>';
+    html+='<td style="padding:8px;font-size:12px;text-align:center;">'+i.date+'</td>';
+    html+='<td style="padding:8px;font-weight:700;text-align:center;">₪'+(i.amtTotal?parseFloat(i.amtTotal).toFixed(2):"—")+'</td>';
+    html+='<td style="padding:8px;font-size:11px;color:'+statusColor+';text-align:center;">'+statusIcon+' '+(i.payment||"טרם שולם")+'</td>';
+    html+='</tr>';
+  });
+  html+='<tr style="background:#6c3eb8;color:#fff;font-weight:700;"><td colspan="2" style="padding:8px;">סה"כ</td><td style="padding:8px;text-align:center;">₪'+total.toFixed(2)+'</td><td></td></tr>';
+  html+='</table></div>';
+
+  MailApp.sendEmail({
+    to:email,
+    subject:"דוח חשבוניות מירב — "+new Date().toLocaleDateString("he-IL"),
+    htmlBody:html
+  });
   return{success:true,message:"הדוח נשלח ל-"+email};
 }
 
