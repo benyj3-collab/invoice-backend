@@ -167,7 +167,8 @@ function getInvoices(params){
   var supplierParam=params.supplier||"all";
   var dateFrom=params.dateFrom||"";
   var dateTo=params.dateTo||"";
-  var statusFilter=params.status||"all";
+  var statusFilter=params.status||params.paidFilter||"all";
+  var catFilter=params.category||"all";
   var supplierList=supplierParam==="all"?[]:supplierParam.split(",").map(function(s){return s.trim();});
   var sh=getSheet();
   var rows=sh.getDataRange().getValues();
@@ -175,19 +176,34 @@ function getInvoices(params){
   for(var i=1;i<rows.length;i++){
     var r=rows[i];
     var sup=String(r[COL.SUPPLIER]||"");
-    var date=String(r[COL.DATE_INV]||"");
-    var paid=String(r[COL.PAID]||"")==="כן";
+    // תיקון תאריך: אם זה Date object המר ל-YYYY-MM-DD
+    var rawDate=r[COL.DATE_INV];
+    var date="";
+    if(rawDate instanceof Date){
+      date=Utilities.formatDate(rawDate,Session.getScriptTimeZone(),"yyyy-MM-dd");
+    } else {
+      date=String(rawDate||"").substring(0,10);
+    }
+    var payment=String(r[COL.PAYMENT]||"");
+    var paidCell=String(r[COL.PAID]||"");
+    var isPaid=paidCell==="כן"||(payment&&payment!==""&&payment!=="טרם שולם"&&payment!=="unpaid");
     if(supplierList.length>0&&supplierList.indexOf(sup)===-1)continue;
     if(dateFrom&&date<dateFrom)continue;
     if(dateTo&&date>dateTo)continue;
-    if(statusFilter==="paid"&&!paid)continue;
-    if(statusFilter==="unpaid"&&paid)continue;
+    if(statusFilter==="paid"&&!isPaid)continue;
+    if(statusFilter==="unpaid"&&isPaid)continue;
+    if(catFilter&&catFilter!=="all"&&String(r[COL.CATEGORY]||"")!==catFilter)continue;
     out.push({
       rowId:sup+"|"+String(r[COL.DIGITS]||""),
       supplier:sup,digits:String(r[COL.DIGITS]||""),date:date,
-      fileUrl:String(r[COL.FILE_URL]||""),payment:String(r[COL.PAYMENT]||""),
-      amount:String(r[COL.AMOUNT]||""),invoiceNum:String(r[COL.INV_NUM]||""),
-      category:String(r[COL.CATEGORY]||""),paid:paid
+      fileUrl:String(r[COL.FILE_URL]||""),payment:payment,
+      amtTotal:String(r[COL.AMOUNT]||""),amtBefore:"",
+      payAmount:String(r[COL.PAY_AMOUNT]||""),payAmount2:String(r[COL.PAY_AMOUNT2]||""),
+      checkNum:String(r[COL.CHECK_NUM]||""),checkNum2:String(r[COL.CHECK_NUM2]||""),
+      checkDate:String(r[COL.CHECK_DATE]||""),checkDate2:String(r[COL.CHECK_DATE2]||""),
+      amount:String(r[COL.AMOUNT]||""),
+      invoiceNum:String(r[COL.INV_NUM]||""),invNum:String(r[COL.INV_NUM]||""),
+      category:String(r[COL.CATEGORY]||""),paid:isPaid
     });
   }
   out.reverse();
@@ -199,16 +215,19 @@ function sendReport(params){
   var inv=getInvoices({supplier:params.supplier||"all",dateFrom:params.dateFrom||"",dateTo:params.dateTo||"",status:params.status||"all"});
   if(!inv.success)return inv;
   var total=0;
-  inv.invoices.forEach(function(i){total+=parseFloat(i.amount)||0;});
-  var body="דוח חשבוניות מירב\n";
+  inv.invoices.forEach(function(i){total+=parseFloat(i.amtTotal)||0;});
+  var body="דוח חשבוניות מירב 🧾\n";
+  body+="============================\n";
   body+="ספק: "+(params.supplier==="all"||!params.supplier?"כל הספקים":params.supplier)+"\n";
   body+="תקופה: "+(params.dateFrom||"—")+" עד "+(params.dateTo||"—")+"\n";
-  body+="סה\"כ: "+inv.invoices.length+" חשבוניות | ₪"+total.toFixed(2)+"\n\n";
+  body+="סה\"כ: "+inv.invoices.length+" חשבוניות | ₪"+total.toFixed(2)+"\n";
+  body+="============================\n\n";
   inv.invoices.forEach(function(i,n){
-    body+=(n+1)+". "+i.supplier+(i.invoiceNum?" #"+i.invoiceNum:"")+" | "+i.digits+" | "+i.date;
-    if(i.amount)body+=" | ₪"+parseFloat(i.amount).toFixed(2);
-    body+=(i.paid?" | ✅ שולם":" | ⏳ לא שולם");
-    if(i.fileUrl)body+="\n"+i.fileUrl;
+    body+=(n+1)+". "+i.supplier+(i.invNum?" #"+i.invNum:"")+" | "+i.digits+" | "+i.date;
+    if(i.amtTotal) body+=" | ₪"+parseFloat(i.amtTotal).toFixed(2);
+    body+=" | "+(i.paid?"✅ שולם":"⏳ לא שולם");
+    if(i.payment&&i.payment!=="טרם שולם") body+=" ("+i.payment+")";
+    if(i.fileUrl) body+="\n   🔗 "+i.fileUrl;
     body+="\n\n";
   });
   MailApp.sendEmail({to:email,subject:"דוח חשבוניות מירב — "+new Date().toLocaleDateString("he-IL"),body:body});
@@ -216,11 +235,12 @@ function sendReport(params){
 }
 
 function buildPayStr(data){
-  if(!data.payment||data.payment==="")return"";
-  if(data.payment==="cash")return"מזומן ₪"+(data.payAmount||"");
-  if(data.payment==="check")return"צ'ק #"+(data.checkNum||"")+" ₪"+(data.payAmount||"")+(data.checkDate?" ("+data.checkDate+")":"");
-  if(data.payment==="both")return"מזומן ₪"+(data.payAmount||"")+" + צ'ק #"+(data.checkNum2||"")+" ₪"+(data.payAmount2||"");
-  return"";
+  if(!data.payment||data.payment===""||data.payment==="unpaid")return"טרם שולם";
+  if(data.payment==="cash")  return"💵 מזומן ₪"+(data.payAmount||"");
+  if(data.payment==="check") return"📄 צ'ק #"+(data.checkNum||"")+" ₪"+(data.payAmount||"")+(data.checkDate?" ("+data.checkDate+")":"");
+  if(data.payment==="both")  return"🔀 מזומן ₪"+(data.payAmount||"")+" + צ'ק #"+(data.checkNum2||"")+" ₪"+(data.payAmount2||"");
+  if(data.payment==="bank")  return"🏦 העברה #"+(data.checkNum||"")+" ₪"+(data.payAmount||"");
+  return String(data.payment);
 }
 
 function createPdfFromImages(pagesB64,mimeTypes,name){
