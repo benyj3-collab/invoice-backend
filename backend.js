@@ -129,7 +129,8 @@ function updatePayment(data){
     if(String(rows[i][COL.SUPPLIER])===supplier&&String(rows[i][COL.DIGITS])===digits){
       var rn=i+1;
       var payStr=buildPayStr(data);
-      var isPaid=(data.payment&&data.payment!=="")?"כן":"";
+      // תיקון: unpaid = לא שולם, שאר = שולם
+      var isPaid=(data.payment&&data.payment!==""&&data.payment!=="unpaid")?"כן":"";
       sh.getRange(rn,COL.PAYMENT+1).setValue(payStr);
       sh.getRange(rn,COL.PAY_AMOUNT+1).setValue(data.payAmount||"");
       sh.getRange(rn,COL.PAY_AMOUNT2+1).setValue(data.payAmount2||"");
@@ -138,6 +139,8 @@ function updatePayment(data){
       sh.getRange(rn,COL.CHECK_DATE+1).setValue(data.checkDate||"");
       sh.getRange(rn,COL.CHECK_DATE2+1).setValue(data.checkDate2||"");
       sh.getRange(rn,COL.PAID+1).setValue(isPaid);
+      // עדכן סכום אם סופק
+      if(data.amtTotal) sh.getRange(rn,COL.AMOUNT+1).setValue(data.amtTotal);
       return{success:true};
     }
   }
