@@ -44,6 +44,7 @@ function doPost(e){
     else if(data.action==="renameSupplier")result=renameSupplier(data);
     else if(data.action==="deleteSupplier")result=deleteSupplier(data);
     else if(data.action==="sendReport")result=sendReport(data);
+    else if(data.action==="sendPDF")result=sendPDF(data);
     else result={success:false,error:"unknown: "+data.action};
     return setCors(ContentService.createTextOutput(JSON.stringify(result)));
   }catch(err){
@@ -291,13 +292,184 @@ function buildPayStr(data){
   return String(data.payment);
 }
 
-function createPdfFromImages(pagesB64,mimeTypes,name){
-  var html='<html><head><style>body{margin:0;padding:0;}.page{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;page-break-after:always;page-break-inside:avoid;overflow:hidden;}.page img{max-width:100%;max-height:100vh;object-fit:contain;display:block;}</style></head><body>';
-  for(var i=0;i<pagesB64.length;i++){
-    var mime=(mimeTypes&&mimeTypes[i])?mimeTypes[i]:"image/jpeg";
-    html+='<div class="page"><img src="data:'+mime+';base64,'+pagesB64[i]+'" /></div>';
+
+// ============================================================
+//  sendPDF — שולח PDF אחד מאוחד עם כל החשבוניות למייל
+// ============================================================
+function sendPDF(data) {
+  var email      = data.email    || "";
+  var supplier   = data.supplier || "all";
+  var dateFrom   = data.dateFrom || "";
+  var dateTo     = data.dateTo   || "";
+
+  if (!email) return { success:false, error:"חסר מייל" };
+
+  // שלב 1: קבל רשימת חשבוניות
+  var inv = getInvoices({ supplier:supplier, dateFrom:dateFrom, dateTo:dateTo, status:"all" });
+  if (!inv.success || !inv.invoices.length) {
+    return { success:false, error:"לא נמצאו חשבוניות לסינון זה" };
   }
-  html+='</body></html>';
-  var blob=Utilities.newBlob(html,"text/html",name+".html");
-  return blob.getAs("application/pdf").setName(name+".pdf");
+
+  var invoices = inv.invoices;
+  var total = 0;
+  invoices.forEach(function(i){ total += parseFloat(i.amtTotal)||0; });
+  var totalPaid = invoices.filter(function(i){ return i.paid; }).length;
+
+  // שלב 2: בנה HTML מלא עבור PDF
+  var html = buildPdfHtml(invoices, supplier, dateFrom, dateTo, total, totalPaid);
+
+  // שלב 3: צור PDF מה-HTML
+  var blob = Utilities.newBlob(html, "text/html", "report.html");
+  var pdf  = blob.getAs("application/pdf");
+  var supLabel = supplier === "all" ? "כל הספקים" : supplier.replace(/,/g," ");
+  var dateLabel = (dateFrom||"הכל") + "_" + (dateTo||"הכל");
+  pdf.setName("חשבוניות_מירב_" + supLabel + "_" + dateLabel + ".pdf");
+
+  // שלב 4: שלח במייל עם PDF מצורף
+  var subject = "חשבוניות מירב — " + supLabel + " | " + new Date().toLocaleDateString("he-IL");
+  var body    = "שלום,\n\nמצורף דוח חשבוניות מירב.\n\n";
+  body += "ספק: " + supLabel + "\n";
+  body += "תקופה: " + (dateFrom||"—") + " עד " + (dateTo||"—") + "\n";
+  body += "סה\"כ חשבוניות: " + invoices.length + "\n";
+  body += "סה\"כ סכום: ₪" + total.toFixed(2) + "\n";
+  body += "שולמו: " + totalPaid + " | טרם שולמו: " + (invoices.length - totalPaid) + "\n\n";
+  body += "בברכה,\nמערכת חשבוניות מירב";
+
+  MailApp.sendEmail({
+    to: email,
+    subject: subject,
+    body: body,
+    attachments: [pdf]
+  });
+
+  return { success:true, message:"PDF נשלח ל-" + email + " (" + invoices.length + " חשבוניות)" };
+}
+
+function buildPdfHtml(invoices, supplier, dateFrom, dateTo, total, totalPaid) {
+  var css = [
+    'body{font-family:Arial,sans-serif;direction:rtl;margin:0;padding:0;color:#1e1040;}',
+    '.cover{page-break-after:always;padding:40px;background:#f3eeff;min-height:100vh;box-sizing:border-box;}',
+    '.cover-logo{text-align:center;margin-bottom:30px;}',
+    '.cover-logo h1{color:#6c3eb8;font-size:32px;margin:0;}',
+    '.cover-logo p{color:#9d8ec4;font-size:14px;margin:6px 0 0;}',
+    '.stats{display:flex;flex-wrap:wrap;gap:16px;margin:30px 0;}',
+    '.stat{background:#fff;border-radius:12px;padding:16px 20px;flex:1;min-width:120px;text-align:center;box-shadow:0 2px 8px rgba(108,62,184,.1);}',
+    '.stat .val{font-size:26px;font-weight:900;color:#6c3eb8;}',
+    '.stat .lbl{font-size:11px;color:#9d8ec4;margin-top:4px;}',
+    '.stat.green .val{color:#16a34a;} .stat.red .val{color:#dc2626;} .stat.gold .val{color:#d97706;}',
+    '.sum-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:13px;}',
+    '.sum-table th{background:#6c3eb8;color:#fff;padding:10px;text-align:right;}',
+    '.sum-table td{padding:9px 10px;border-bottom:1px solid #eee;}',
+    '.sum-table tr:nth-child(even) td{background:#f9f6ff;}',
+    '.sum-table .total-row td{background:#6c3eb8;color:#fff;font-weight:900;}',
+    '.paid{color:#16a34a;font-weight:700;} .unpaid{color:#dc2626;font-weight:700;}',
+    '.inv-page{page-break-before:always;padding:24px;box-sizing:border-box;}',
+    '.inv-header{background:linear-gradient(135deg,#6c3eb8,#8b5cf6);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:16px;}',
+    '.inv-header h2{margin:0;font-size:18px;} .inv-header p{margin:4px 0 0;font-size:12px;opacity:.85;}',
+    '.inv-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}',
+    '.meta-box{background:#f3eeff;border-radius:8px;padding:8px 14px;flex:1;min-width:110px;}',
+    '.meta-box .mk{font-size:10px;color:#9d8ec4;font-weight:700;} .meta-box .mv{font-size:14px;font-weight:900;color:#1e1040;}',
+    '.inv-img{text-align:center;} .inv-img img{max-width:100%;max-height:700px;border-radius:8px;border:1px solid #ddd;}'
+  ].join('');
+
+  var html = '<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8">';
+  html += '<style>' + css + '</style></head><body>';
+
+  // --- דף שער ---
+  var supLabel = supplier === "all" ? "כל הספקים" : supplier.replace(/,/g, ", ");
+  html += '<div class="cover">';
+  html += '<div class="cover-logo">';
+  html += '<h1>🧾 חשבוניות מירב</h1>';
+  html += '<p>דוח חשבוניות | ' + supLabel + '</p>';
+  html += '<p>' + (dateFrom||"הכל") + ' — ' + (dateTo||"הכל") + '</p>';
+  html += '<p style="font-size:12px;color:#aaa;">הופק: ' + new Date().toLocaleDateString("he-IL") + '</p>';
+  html += '</div>';
+
+  html += '<div class="stats">';
+  html += '<div class="stat"><div class="val">' + invoices.length + '</div><div class="lbl">חשבוניות</div></div>';
+  html += '<div class="stat gold"><div class="val">₪' + total.toFixed(0) + '</div><div class="lbl">סה"כ</div></div>';
+  html += '<div class="stat green"><div class="val">' + totalPaid + '</div><div class="lbl">שולמו</div></div>';
+  html += '<div class="stat red"><div class="val">' + (invoices.length - totalPaid) + '</div><div class="lbl">לא שולמו</div></div>';
+  html += '</div>';
+
+  // טבלת סיכום בדף שער
+  html += '<table class="sum-table">';
+  html += '<tr><th>#</th><th>מס׳</th><th>ספק</th><th>תאריך</th><th>סכום ₪</th><th>תשלום</th><th>סטטוס</th></tr>';
+  invoices.forEach(function(inv, n) {
+    var isPaid = inv.paid === true || inv.paid === "true";
+    html += '<tr>';
+    html += '<td>' + (n+1) + '</td>';
+    html += '<td style="color:#6c3eb8;font-weight:700;">' + (inv.invNum ? "#"+inv.invNum : "—") + '</td>';
+    html += '<td style="font-weight:700;">' + (inv.supplier||"") + '</td>';
+    html += '<td>' + (inv.date||"") + '</td>';
+    html += '<td style="font-weight:700;">₪' + (parseFloat(inv.amtTotal)||0).toFixed(2) + '</td>';
+    html += '<td style="font-size:12px;">' + (inv.payment||"טרם שולם") + '</td>';
+    html += '<td class="' + (isPaid?"paid":"unpaid") + '">' + (isPaid?"✅ שולם":"❌ לא שולם") + '</td>';
+    html += '</tr>';
+  });
+  html += '<tr class="total-row"><td colspan="4">סה"כ</td><td>₪' + total.toFixed(2) + '</td><td></td><td>' + totalPaid + '/' + invoices.length + '</td></tr>';
+  html += '</table></div>';
+
+  // --- עמוד לכל חשבונית ---
+  invoices.forEach(function(inv, n) {
+    var isPaid = inv.paid === true || inv.paid === "true";
+
+    html += '<div class="inv-page">';
+
+    // כותרת
+    html += '<div class="inv-header">';
+    html += '<h2>' + (inv.supplier||"") + (inv.invNum ? ' — #' + inv.invNum : '') + '</h2>';
+    html += '<p>חשבונית ' + (n+1) + ' מתוך ' + invoices.length + '</p>';
+    html += '</div>';
+
+    // פרטים
+    html += '<div class="inv-meta">';
+    html += '<div class="meta-box"><div class="mk">תאריך</div><div class="mv">' + (inv.date||"—") + '</div></div>';
+    html += '<div class="meta-box"><div class="mk">ספרות</div><div class="mv" style="letter-spacing:3px;">' + (inv.digits||"—") + '</div></div>';
+    html += '<div class="meta-box"><div class="mk">סכום</div><div class="mv">₪' + (parseFloat(inv.amtTotal)||0).toFixed(2) + '</div></div>';
+    html += '<div class="meta-box"><div class="mk">קטגוריה</div><div class="mv">' + (inv.category||"—") + '</div></div>';
+    html += '<div class="meta-box" style="flex:2;"><div class="mk">תשלום</div><div class="mv ' + (isPaid?"paid":"unpaid") + '">' + (inv.payment||"טרם שולם") + '</div></div>';
+    html += '</div>';
+
+    // תמונה מ-Drive
+    if (inv.fileUrl) {
+      try {
+        var fileId = extractFileId(inv.fileUrl);
+        if (fileId) {
+          var file = DriveApp.getFileById(fileId);
+          var mimeType = file.getMimeType();
+          if (mimeType === "application/pdf") {
+            // PDF — הכנס הודעה
+            html += '<div style="text-align:center;padding:30px;background:#f3eeff;border-radius:8px;">';
+            html += '<p style="font-size:14px;color:#6c3eb8;">📄 קובץ PDF — <a href="' + inv.fileUrl + '">' + inv.fileUrl + '</a></p>';
+            html += '</div>';
+          } else {
+            // תמונה — הכנס ישירות
+            var imgData = Utilities.base64Encode(file.getBlob().getBytes());
+            html += '<div class="inv-img"><img src="data:' + mimeType + ';base64,' + imgData + '" /></div>';
+          }
+        }
+      } catch(e) {
+        html += '<div style="text-align:center;padding:20px;color:#9d8ec4;"><p>לא ניתן לטעון את התמונה</p><p><a href="' + inv.fileUrl + '">' + inv.fileUrl + '</a></p></div>';
+      }
+    } else {
+      html += '<div style="text-align:center;padding:30px;color:#9d8ec4;">אין קובץ מצורף</div>';
+    }
+
+    html += '</div>'; // inv-page
+  });
+
+  html += '</body></html>';
+  return html;
+}
+
+function extractFileId(url) {
+  if (!url) return null;
+  var m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  m = url.match(/id=([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  return null;
 }
